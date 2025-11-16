@@ -37,8 +37,8 @@ public class UserService {
                     .build();
         } catch (Exception e) {
             return Response.builder()
-                    .message("Fail: " + e.getMessage()).
-                    build();
+                    .message("Fail: " + e.getMessage())
+                    .build();
         }
     }
 
@@ -57,13 +57,13 @@ public class UserService {
                     .build();
         }
 
-        return  Response.builder()
+        return Response.builder()
                 .message("Incorrect credentials!")
                 .build();
     }
 
     public Response update(Long id, CreateAccountRequest userRequest) {
-       Optional <User> user = userRepository.findById(id);
+       Optional<User> user = userRepository.findById(id);
 
        if(user.isPresent()) {
            user.get().setEmail(userRequest.getEmail());
@@ -81,12 +81,12 @@ public class UserService {
                   .build();
        }
        return Response.builder()
-               .message("Unable To Update Account!\nUnable To Find Account!")
+               .message("Unable To Update Account! Unable To Find Account!")
                .build();
     }
 
     public Response delete(Long id) {
-        Optional <User> user = userRepository.findById(id);
+        Optional<User> user = userRepository.findById(id);
 
         if(user.isPresent()) {
             userRepository.delete(user.get());
@@ -95,7 +95,7 @@ public class UserService {
                     .build();
         }
         return Response.builder()
-                .message("Unable To Delete Account!\nnUnable To Find Account!")
+                .message("Unable To Delete Account! Unable To Find Account!")
                 .build();
     }
 }
