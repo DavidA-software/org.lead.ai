@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class Request {
-    p
+    private String text;
+    private Long userId;
 }
