@@ -1,6 +1,6 @@
 import re
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 
@@ -109,14 +109,10 @@ class SchedulingChatbot:
             entities['date'] = date_match.group(1).strip()
 
             # Simple simulation to convert common dates
-
             if 'today' in entities['date'].lower():
-
-                 entities['date'] = datetime.now().strftime('%Y-%m-%d')
-
+                entities['date'] = datetime.now().strftime('%Y-%m-%d')
             elif 'tomorrow' in entities['date'].lower():
-
-                entities['date'] = (datetime.now() + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+                entities['date'] = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
 
             # For demonstration, we assume a clean date format is provided or derived
 
