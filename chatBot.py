@@ -2,6 +2,10 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 
+from datetime import datetime, timedelta
+
+
+
 class SchedulingChatbot:
     """
     An enhanced AI Chatbot with advanced NLP-driven scheduling capabilities.
@@ -174,6 +178,74 @@ class SchedulingChatbot:
             if len(temp_text) > 2:
                 entities['event'] = temp_text
         
+
+
+    def extract_entities(self, text: str) -> dict:
+
+        """
+
+        Extracts key entities (date, time, event name) from the text.
+
+        (Simulated NLP Named Entity Recognition - NER)
+
+
+
+        Args:
+
+            text: The raw user input string.
+
+
+
+        Returns:
+
+            A dictionary of extracted entities.
+
+        """
+
+        entities = {'event': None, 'date': None, 'time': None}
+
+
+
+        # Simple date pattern simulation (e.g., "tomorrow", "Nov 15", "today")
+
+        date_match = re.search(r'on (.*?)(?: at |$)', text, re.IGNORECASE)
+
+        if date_match:
+
+            entities['date'] = date_match.group(1).strip()
+
+            # Simple simulation to convert common dates
+            if 'today' in entities['date'].lower():
+                entities['date'] = datetime.now().strftime('%Y-%m-%d')
+            elif 'tomorrow' in entities['date'].lower():
+                entities['date'] = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+
+            # For demonstration, we assume a clean date format is provided or derived
+
+
+
+        # Simple time pattern simulation (e.g., "at 3pm", "14:00")
+
+        time_match = re.search(r'at (\d{1,2}(?::\d{2})?\s?(?:am|pm|o\'clock)?)', text, re.IGNORECASE)
+
+        if time_match:
+
+            entities['time'] = time_match.group(1).strip()
+
+
+
+        # Simple event extraction (the rest of the text, typically)
+
+        # This is very basic and would be handled better by a token-based model
+
+        event_match = re.search(r'to (.*?)(?: on |$)', text, re.IGNORECASE)
+
+        if event_match:
+
+            entities['event'] = event_match.group(1).strip()
+
+
+
         return entities
 
     def add_event(self, date: str, event_details: str, time: Optional[str] = None, 
