@@ -1,184 +1,360 @@
 import re
 from datetime import datetime, timedelta
+from typing import Optional, Dict
 
 class SchedulingChatbot:
     """
-    A simulated AI Chatbot focused on NLP-driven scheduling tasks.
-    
-    This class simulates the core logic of intent recognition, entity extraction,
-    and managing a simple calendar. In a production system, 'extract_intent'
-    and 'extract_entities' would be powered by advanced NLP models (e.g., PyTorch,
-    spaCy, or Hugging Face Transformers) to handle complex and ambiguous user language.
+    An enhanced AI Chatbot with advanced NLP-driven scheduling capabilities.
     """
     
     def __init__(self):
-        # A simple dictionary to store scheduled events (simulated calendar)
-        # Key: Date string (e.g., "2025-11-05"), Value: List of events/descriptions
         self.calendar = {}
-        print("🤖 Scheduling Chatbot initialized. Ready to process input.")
+        self.event_id_counter = 0
+        print("🤖 Enhanced Scheduling Chatbot initialized and ready!")
+        print("💬 Try: 'Schedule team meeting tomorrow at 2pm'\n")
 
     def extract_intent(self, text: str) -> str:
-        """
-        Determines the user's intent from the input text.
-        (Simulated NLP Intent Classification)
-        
-        Args:
-            text: The raw user input string.
-        
-        Returns:
-            The determined intent ('add_event', 'check_schedule', 'suggestion', 'unknown').
-        """
+        """Advanced intent classification."""
         text_lower = text.lower()
-        if any(keyword in text_lower for keyword in ["schedule", "add", "put in", "book"]):
+        
+        if any(kw in text_lower for kw in ["delete", "cancel", "remove", "clear"]):
+            return 'delete_event'
+        
+        if any(kw in text_lower for kw in ["update", "modify", "change", "move", "reschedule"]):
+            return 'update_event'
+        
+        if any(kw in text_lower for kw in ["schedule", "add", "book", "put in", "setup", 
+                                            "create", "plan", "arrange", "meeting", "appointment"]):
             return 'add_event'
-        if any(keyword in text_lower for keyword in ["what is", "show me", "check my", "agenda", "calendar"]):
+        
+        if any(kw in text_lower for kw in ["what", "show", "check", "view", "see", "list",
+                                            "agenda", "calendar", "schedule for", "what's on",
+                                            "do i have", "am i free", "any events"]):
             return 'check_schedule'
-        if any(keyword in text_lower for keyword in ["suggest", "advice", "free time", "help me plan"]):
+        
+        if any(kw in text_lower for kw in ["suggest", "recommend", "advice", "free time", 
+                                            "when should", "help me plan", "available"]):
             return 'suggestion'
+        
+        if any(kw in text_lower for kw in ["help", "what can you do", "how do i", "commands"]):
+            return 'help'
+        
         return 'unknown'
 
-    def extract_entities(self, text: str) -> dict:
-        """
-        Extracts key entities (date, time, event name) from the text.
-        (Simulated NLP Named Entity Recognition - NER)
+    def parse_date(self, text: str) -> Optional[str]:
+        """Enhanced date parsing."""
+        text_lower = text.lower()
+        today = datetime.now()
         
-        Args:
-            text: The raw user input string.
+        if 'today' in text_lower:
+            return today.strftime('%Y-%m-%d')
+        if 'tomorrow' in text_lower:
+            return (today + timedelta(days=1)).strftime('%Y-%m-%d')
+        if 'yesterday' in text_lower:
+            return (today - timedelta(days=1)).strftime('%Y-%m-%d')
         
-        Returns:
-            A dictionary of extracted entities.
-        """
-        entities = {'event': None, 'date': None, 'time': None}
+        weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        for i, day in enumerate(weekdays):
+            if day in text_lower:
+                days_ahead = i - today.weekday()
+                if days_ahead <= 0:
+                    days_ahead += 7
+                return (today + timedelta(days=days_ahead)).strftime('%Y-%m-%d')
+        
+        match = re.search(r'in (\d+) days?', text_lower)
+        if match:
+            days = int(match.group(1))
+            return (today + timedelta(days=days)).strftime('%Y-%m-%d')
+        
+        date_patterns = [
+            (r'(\d{4})-(\d{1,2})-(\d{1,2})', lambda m: f"{m.group(1)}-{m.group(2).zfill(2)}-{m.group(3).zfill(2)}"),
+            (r'(\d{1,2})/(\d{1,2})/(\d{4})', lambda m: f"{m.group(3)}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"),
+            (r'(\d{1,2})/(\d{1,2})(?!/)', lambda m: f"{today.year}-{m.group(1).zfill(2)}-{m.group(2).zfill(2)}"),
+        ]
+        
+        for pattern, formatter in date_patterns:
+            match = re.search(pattern, text)
+            if match:
+                return formatter(match)
+        
+        months = ['january', 'february', 'march', 'april', 'may', 'june',
+                 'july', 'august', 'september', 'october', 'november', 'december']
+        for i, month in enumerate(months, 1):
+            pattern = rf'{month[:3]}\.?\s+(\d{{1,2}})'
+            match = re.search(pattern, text_lower)
+            if match:
+                day = match.group(1)
+                return f"{today.year}-{str(i).zfill(2)}-{day.zfill(2)}"
+        
+        return None
 
-        # Simple date pattern simulation (e.g., "tomorrow", "Nov 15", "today")
-        date_match = re.search(r'on (.*?)(?: at |$)', text, re.IGNORECASE)
-        if date_match:
-            entities['date'] = date_match.group(1).strip()
-            # Simple simulation to convert common dates
-            if 'today' in entities['date'].lower():
-                entities['date'] = datetime.now().strftime('%Y-%m-%d')
-            elif 'tomorrow' in entities['date'].lower():
-                entities['date'] = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
-            # For demonstration, we assume a clean date format is provided or derived
+    def parse_time(self, text: str) -> Optional[str]:
+        """Enhanced time parsing."""
+        text_lower = text.lower()
+        
+        match = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)', text_lower)
+        if match:
+            hour = int(match.group(1))
+            minute = match.group(2) or "00"
+            period = match.group(3)
+            
+            if period == 'pm' and hour != 12:
+                hour += 12
+            elif period == 'am' and hour == 12:
+                hour = 0
+            
+            return f"{hour:02d}:{minute}"
+        
+        match = re.search(r'(\d{1,2}):(\d{2})', text)
+        if match:
+            hour = int(match.group(1))
+            minute = match.group(2)
+            if 0 <= hour <= 23:
+                return f"{hour:02d}:{minute}"
+        
+        time_mappings = {
+            'noon': '12:00',
+            'midnight': '00:00',
+            'morning': '09:00',
+            'afternoon': '14:00',
+            'evening': '18:00',
+            'night': '20:00'
+        }
+        for word, time in time_mappings.items():
+            if word in text_lower:
+                return time
+        
+        return None
 
-        # Simple time pattern simulation (e.g., "at 3pm", "14:00")
-        time_match = re.search(r'at (\d{1,2}(?::\d{2})?\s?(?:am|pm|o\'clock)?)', text, re.IGNORECASE)
-        if time_match:
-            entities['time'] = time_match.group(1).strip()
-
-        # Simple event extraction (the rest of the text, typically)
-        # This is very basic and would be handled better by a token-based model
-        event_match = re.search(r'to (.*?)(?: on |$)', text, re.IGNORECASE)
-        if event_match:
-            entities['event'] = event_match.group(1).strip()
-
+    def extract_entities(self, text: str) -> Dict:
+        """Enhanced entity extraction."""
+        entities = {'event': None, 'date': None, 'time': None, 'duration': None}
+        
+        entities['date'] = self.parse_date(text)
+        entities['time'] = self.parse_time(text)
+        
+        duration_match = re.search(r'for (\d+)\s*(hour|hr|minute|min)', text.lower())
+        if duration_match:
+            value = int(duration_match.group(1))
+            unit = duration_match.group(2)
+            if 'hour' in unit or 'hr' in unit:
+                entities['duration'] = f"{value}h"
+            else:
+                entities['duration'] = f"{value}m"
+        
+        # Extract event name - simplified and robust
+        patterns = [
+            r'(?:schedule|add|book|setup|create|plan)\s+(?:a\s+|an\s+)?(.+?)(?:\s+(?:on|at|tomorrow|today|yesterday|next|this|for|in)\s+|\s+\d)',
+            r'(?:schedule|add|book|setup|create|plan)\s+(?:a\s+|an\s+)?(.+?)$',
+            r'^(.+?)\s+(?:on|at)\s+',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                event_text = match.group(1).strip()
+                event_text = re.sub(r'\s+(on|at|in|for|with)$', '', event_text, flags=re.IGNORECASE)
+                event_text = re.sub(r'^(the|a|an|my|our)\s+', '', event_text, flags=re.IGNORECASE).strip()
+                
+                if len(event_text) > 2 and event_text.lower() not in ['a', 'an', 'the']:
+                    entities['event'] = event_text
+                    break
+        
+        if not entities['event']:
+            temp_text = text
+            
+            for word in ['schedule', 'add', 'book', 'please', 'can you', 'could you', 'setup', 'create', 'plan']:
+                temp_text = re.sub(rf'\b{word}\b', '', temp_text, flags=re.IGNORECASE)
+            
+            temp_text = re.sub(r'\b(today|tomorrow|yesterday|next\s+\w+|this\s+\w+|\d{1,2}/\d{1,2}(/\d{4})?|\d{4}-\d{2}-\d{2})\b', '', temp_text, flags=re.IGNORECASE)
+            temp_text = re.sub(r'\b(at\s+)?\d{1,2}(:\d{2})?\s*(am|pm)?\b', '', temp_text, flags=re.IGNORECASE)
+            temp_text = re.sub(r'\b(on|at|in|for)\b', '', temp_text, flags=re.IGNORECASE)
+            temp_text = ' '.join(temp_text.split()).strip()
+            
+            if len(temp_text) > 2:
+                entities['event'] = temp_text
+        
         return entities
 
-    def add_event(self, date: str, event_details: str) -> str:
-        """Adds a new event to the calendar."""
+    def add_event(self, date: str, event_details: str, time: Optional[str] = None, 
+                  duration: Optional[str] = None) -> str:
+        """Add event with conflict detection."""
         if not date or not event_details:
-            return "❌ Error: I need a date and details to add an event."
-
+            return "❌ I need both a date and event description. Try: 'Schedule team meeting tomorrow at 2pm'"
+        
         if date not in self.calendar:
             self.calendar[date] = []
+        
+        if time:
+            conflicts = [e for e in self.calendar[date] if time in e]
+            if conflicts:
+                return f"⚠️ Warning: You already have an event at {time} on {date}:\n  • {conflicts[0]}\nScheduling anyway..."
+        
+        self.event_id_counter += 1
+        event_str = f"[ID:{self.event_id_counter}] {event_details}"
+        if time:
+            event_str += f" at {time}"
+        if duration:
+            event_str += f" ({duration})"
+        
+        self.calendar[date].append(event_str)
+        
+        date_obj = datetime.strptime(date, '%Y-%m-%d')
+        formatted_date = date_obj.strftime('%A, %B %d, %Y')
+        
+        return f"✅ Event scheduled!\n📅 {formatted_date}\n⏰ {time or 'Time not specified'}\n📝 {event_details}"
 
-        self.calendar[date].append(event_details)
-        return f"✅ Success! Event '{event_details}' scheduled for {date}."
-
-    def get_schedule(self, date: str) -> str:
-        """Retrieves the schedule for a given date."""
+    def get_schedule(self, date: Optional[str] = None, range_days: int = 1) -> str:
+        """Get schedule with optional date range."""
         if not date:
-            return "❌ Error: Please specify a date to check the schedule."
+            date = datetime.now().strftime('%Y-%m-%d')
+        
+        results = []
+        current = datetime.strptime(date, '%Y-%m-%d')
+        
+        for i in range(range_days):
+            check_date = (current + timedelta(days=i)).strftime('%Y-%m-%d')
+            date_obj = datetime.strptime(check_date, '%Y-%m-%d')
+            formatted_date = date_obj.strftime('%A, %B %d')
+            
+            if check_date in self.calendar and self.calendar[check_date]:
+                events = '\n  • '.join(self.calendar[check_date])
+                results.append(f"📅 {formatted_date}:\n  • {events}")
+            else:
+                results.append(f"📅 {formatted_date}: ✨ Free day!")
+        
+        if results:
+            header = "🗓️  Your Schedule" if range_days == 1 else f"🗓️  Your {range_days}-Day Schedule"
+            return f"{header}\n\n" + "\n\n".join(results)
+        
+        return "✨ Your calendar is completely clear!"
 
-        if date in self.calendar and self.calendar[date]:
-            events = "\n  - " + "\n  - ".join(self.calendar[date])
-            return f"🗓️ Your schedule for {date}:\n{events}"
-        else:
-            return f"✨ You have no events scheduled for {date}. Free day!"
+    def delete_event(self, text: str) -> str:
+        """Delete events by ID."""
+        id_match = re.search(r'id:?\s*(\d+)', text.lower())
+        if id_match:
+            event_id = int(id_match.group(1))
+            for date, events in self.calendar.items():
+                for event in events:
+                    if f"[ID:{event_id}]" in event:
+                        self.calendar[date].remove(event)
+                        return f"✅ Deleted event: {event.split(']')[1].strip()}"
+            return f"❌ No event found with ID {event_id}"
+        
+        return "❌ Please specify an event ID. Use 'show calendar' to see IDs."
 
     def make_suggestion(self) -> str:
-        """Offers a scheduling suggestion based on the current calendar state."""
-        # Simple suggestion: find the day with the fewest events
+        """Smart scheduling suggestions."""
         if not self.calendar:
-            return "💡 Your calendar is empty! Why not schedule a break or a learning session?"
-
-        day_counts = {date: len(events) for date, events in self.calendar.items()}
-        # Find the day with the minimum number of events
+            return "💡 Your calendar is empty! Great time to:\n  • Block focus time for deep work\n  • Schedule regular breaks\n  • Plan your week ahead"
+        
+        today = datetime.now()
+        week_dates = [(today + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+        
+        day_counts = {date: len(self.calendar.get(date, [])) for date in week_dates}
+        free_days = [date for date in week_dates if day_counts[date] == 0]
+        busy_days = [date for date in week_dates if day_counts[date] >= 3]
+        
+        suggestions = ["💡 Smart Scheduling Suggestions:\n"]
+        
+        if free_days:
+            free_date = datetime.strptime(free_days[0], '%Y-%m-%d')
+            suggestions.append(f"  • {free_date.strftime('%A')} is completely free - perfect for focused work")
+        
+        if busy_days:
+            busy_date = datetime.strptime(busy_days[0], '%Y-%m-%d')
+            suggestions.append(f"  • {busy_date.strftime('%A')} is packed - consider buffering breaks")
+        
         lightest_day = min(day_counts, key=day_counts.get)
-        min_events = day_counts[lightest_day]
+        lightest_date = datetime.strptime(lightest_day, '%Y-%m-%d')
+        suggestions.append(f"  • {lightest_date.strftime('%A')} has the most availability")
+        
+        return "\n".join(suggestions)
 
-        if min_events == 0:
-            return f"💡 I see {lightest_day} is completely free. That would be a great time for a deep work session or a fitness class."
-        elif min_events <= 1:
-            return f"💡 {lightest_day} only has {min_events} event(s). I suggest blocking out two hours that day for a high-priority task."
-        else:
-            return "💡 Your calendar looks pretty packed this week. Make sure to schedule short breaks between your meetings!"
+    def show_help(self) -> str:
+        """Display help message."""
+        return """
+🤖 **Scheduling Chatbot - Command Guide**
+
+📝 **Add Events:**
+  • "Schedule team meeting tomorrow at 2pm"
+  • "Add doctor appointment on Friday at 9:30am"
+  • "Book project review next Monday afternoon"
+
+📅 **Check Schedule:**
+  • "What's on my calendar today?"
+  • "Show me tomorrow's agenda"
+  • "What do I have this week?"
+
+🗑️ **Delete Events:**
+  • "Delete event ID:5"
+
+💡 **Get Suggestions:**
+  • "When am I free this week?"
+  • "Suggest a good time to focus"
+"""
 
     def process_input(self, user_input: str) -> str:
-        """
-        The main processing pipeline: intent -> entities -> action.
-        """
+        """Main processing pipeline."""
         intent = self.extract_intent(user_input)
         entities = self.extract_entities(user_input)
-        response = ""
-
+        
         print(f"\n[DEBUG] Input: '{user_input}'")
-        print(f"[DEBUG] Intent Detected: {intent}")
-        print(f"[DEBUG] Entities Extracted: {entities}")
-
-        if intent == 'add_event':
+        print(f"[DEBUG] Intent: {intent}")
+        print(f"[DEBUG] Entities: {entities}")
+        
+        if intent == 'help':
+            return self.show_help()
+        
+        elif intent == 'add_event':
             event = entities.get('event')
-            if event and entities.get('date'):
-                response = self.add_event(entities['date'], f"{event} ({entities.get('time', 'Time unspecified')})")
-            else:
-                response = "🤔 I need more details to schedule that. Please tell me the event and the date/time."
-
+            date = entities.get('date')
+            time = entities.get('time')
+            duration = entities.get('duration')
+            
+            if not event:
+                return "🤔 What would you like to schedule? Try: 'Schedule team standup tomorrow at 10am'"
+            if not date:
+                return "🤔 When should I schedule this? Try adding 'tomorrow' or a specific date."
+            
+            return self.add_event(date, event, time, duration)
+        
         elif intent == 'check_schedule':
-            date_to_check = entities.get('date', datetime.now().strftime('%Y-%m-%d'))  # Default to today
-            response = self.get_schedule(date_to_check)
-
+            if any(word in user_input.lower() for word in ['week', 'next 7', 'coming days']):
+                date = entities.get('date', datetime.now().strftime('%Y-%m-%d'))
+                return self.get_schedule(date, range_days=7)
+            else:
+                date = entities.get('date')
+                return self.get_schedule(date)
+        
+        elif intent == 'delete_event':
+            return self.delete_event(user_input)
+        
         elif intent == 'suggestion':
-            response = self.make_suggestion()
-
+            return self.make_suggestion()
+        
         else:
-            response = "I'm sorry, I only handle scheduling and suggestion requests. Try asking to 'schedule a meeting' or 'check my calendar'."
-
-        return response
+            return "🤔 I'm not sure what you'd like me to do. Type 'help' to see what I can do!"
 
 
 if __name__ == '__main__':
-    # Initialize and run the demonstration
     bot = SchedulingChatbot()
-    print("-" * 50)
-    print("DEMO: Enter commands to test the chatbot.")
-    print("-" * 50)
-
-    # 1. Add an event
-    input_1 = "I need to add a meeting to finalize the project proposal to the calendar on 2025-11-15 at 3pm"
-    print(f"User: {input_1}")
-    print(f"Bot: {bot.process_input(input_1)}")
-    print("-" * 20)
-
-    # 2. Add another event (using today shortcut)
-    input_2 = "Can you schedule a deep work session on today at 10:00am"
-    print(f"User: {input_2}")
-    print(f"Bot: {bot.process_input(input_2)}")
-    print("-" * 20)
-
-    # 3. Check the schedule
-    input_3 = "What is my agenda for 2025-11-15?"
-    print(f"User: {input_3}")
-    print(f"Bot: {bot.process_input(input_3)}")
-    print("-" * 20)
-
-    # 4. Get a suggestion
-    input_4 = "Can you suggest when I have free time?"
-    print(f"User: {input_4}")
-    print(f"Bot: {bot.process_input(input_4)}")
-    print("-" * 50)
-
-    # 5. Check today's schedule
-    input_5 = "Show me what I have today."
-    print(f"User: {input_5}")
-    print(f"Bot: {bot.process_input(input_5)}")
-    print("-" * 50)
+    
+    print("\n" + "=" * 80)
+    print("🎬 LIVE DEMO")
+    print("=" * 80)
+    
+    demo_commands = [
+        "Schedule team meeting tomorrow at 3pm",
+        "Add doctor appointment on Friday at 9:30am",
+        "Book lunch next Monday at noon",
+        "What's on my calendar tomorrow?",
+        "Show me this week",
+        "When am I free this week?",
+    ]
+    
+    for cmd in demo_commands:
+        print(f"\n💬 User: {cmd}")
+        response = bot.process_input(cmd)
+        print(f"🤖 Bot: {response}")
+        print("-" * 80)
