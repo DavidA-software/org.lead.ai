@@ -1019,3 +1019,466 @@ body {
 
 - [ ] Copy all fixed Java files to backend
 - [ ]
+
+
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, UserPlus, LogIn, Calendar, User, LogOut, Loader } from 'lucide-react';
+
+const API_BASE_URL = 'http://localhost:8080';
+
+export default function OrgLeadAIApp() {
+  const [view, setView] = useState('login');
+  const [user, setUser] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [signupForm, setSignupForm] = useState({
+    email: '', password: '', firstName: '', lastName: ''
+  });
+  const [error, setError] = useState('');
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleLogin = async () => {
+    if (!loginForm.email || !loginForm.password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginForm)
+      });
+      
+      const data = await response.json();
+      
+      if (data.id) {
+        setUser(data);
+        setView('chat');
+        setMessages([{
+          text: `Welcome back, ${data.firstName}! I'm your scheduling assistant. How can I help you today?`,
+          sender: 'bot',
+          timestamp: new Date()
+        }]);
+        setLoginForm({ email: '', password: '' });
+      } else {
+        setError(data.message || 'Login failed. Please check your credentials.');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Cannot connect to server. Please make sure the backend is running on port 8080.');
+    }
+    
+    setLoading(false);
+  };
+
+  const handleSignup = async () => {
+    if (!signupForm.email || !signupForm.password || !signupForm.firstName || !signupForm.lastName) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(signupForm)
+      });
+      
+      const data = await response.json();
+      
+      if (data.id) {
+        alert('Account created successfully! Please login.');
+        setView('login');
+        setSignupForm({ email: '', password: '', firstName: '', lastName: '' });
+        setError('');
+      } else {
+        setError(data.message || 'Signup failed. Email might already be in use.');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      setError('Cannot connect to server. Please make sure the backend is running on port 8080.');
+    }
+    
+    setLoading(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim()) return;
+
+    const userMessage = { 
+      text: inputMessage, 
+      sender: 'user',
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputMessage;
+    setInputMessage('');
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(currentInput)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const botResponse = await response.text();
+      
+      setMessages(prev => [...prev, { 
+        text: botResponse, 
+        sender: 'bot',
+        timestamp: new Date()
+      }]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      setMessages(prev => [...prev, {
+        text: '❌ Sorry, I could not connect to the chatbot service. Please make sure:\n1. Backend is running on port 8080\n2. Python Flask app is running on port 8000',
+        sender: 'bot',
+        timestamp: new Date()
+      }]);
+    }
+    
+    setLoading(false);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setMessages([]);
+    setView('login');
+    setError('');
+  };
+
+  const handleKeyPress = (e, action) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      action();
+    }
+  };
+
+  if (view === 'login') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md border border-gray-100">
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-indigo-100 p-4 rounded-2xl">
+              <Calendar className="w-12 h-12 text-indigo-600" />
+            </div>
+          </div>
+          
+          <h1 className="text-4xl font-bold text-center text-gray-800 mb-2">OrgLead AI</h1>
+          <p className="text-center text-gray-600 mb-8">Your Smart Scheduling Assistant</p>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                value={loginForm.email}
+                onChange={(e) => setLoginForm({...loginForm, email: e.target.value})}
+                onKeyPress={(e) => handleKeyPress(e, handleLogin)}
+                disabled={loading}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+                onKeyPress={(e) => handleKeyPress(e, handleLogin)}
+                disabled={loading}
+              />
+            </div>
+            
+            <button
+              onClick={handleLogin}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg"
+            >
+              {loading ? (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-5 h-5" />
+                  Login
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setView('signup');
+                setError('');
+              }}
+              className="text-indigo-600 hover:text-indigo-700 font-semibold transition"
+              disabled={loading}
+            >
+              Don't have an account? Sign up
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'signup') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md border border-gray-100">
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-purple-100 p-4 rounded-2xl">
+              <UserPlus className="w-12 h-12 text-purple-600" />
+            </div>
+          </div>
+          
+          <h1 className="text-4xl font-bold text-center text-gray-800 mb-2">Create Account</h1>
+          <p className="text-center text-gray-600 mb-8">Join OrgLead AI today</p>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">First Name</label>
+                <input
+                  type="text"
+                  placeholder="John"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                  value={signupForm.firstName}
+                  onChange={(e) => setSignupForm({...signupForm, firstName: e.target.value})}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Last Name</label>
+                <input
+                  type="text"
+                  placeholder="Doe"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                  value={signupForm.lastName}
+                  onChange={(e) => setSignupForm({...signupForm, lastName: e.target.value})}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                placeholder="your@email.com"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                value={signupForm.email}
+                onChange={(e) => setSignupForm({...signupForm, email: e.target.value})}
+                disabled={loading}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                value={signupForm.password}
+                onChange={(e) => setSignupForm({...signupForm, password: e.target.value})}
+                onKeyPress={(e) => handleKeyPress(e, handleSignup)}
+                disabled={loading}
+              />
+            </div>
+            
+            <button
+              onClick={handleSignup}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-xl hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-5 h-5" />
+                  Create Account
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setView('login');
+                setError('');
+              }}
+              className="text-purple-600 hover:text-purple-700 font-semibold transition"
+              disabled={loading}
+            >
+              Already have an account? Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+      <header className="bg-white shadow-md border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-100 p-2 rounded-xl">
+              <Calendar className="w-8 h-8 text-indigo-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">OrgLead AI</h1>
+              <p className="text-xs text-gray-500">Scheduling Assistant</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-200">
+              <User className="w-5 h-5 text-gray-600" />
+              <span className="font-semibold text-gray-700">{user?.firstName} {user?.lastName}</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-xl transition border border-transparent hover:border-red-200"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="font-medium">Logout</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-5xl w-full mx-auto p-6 flex flex-col">
+        <div className="bg-white rounded-3xl shadow-xl flex-1 flex flex-col overflow-hidden border border-gray-200">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{maxHeight: 'calc(100vh - 250px)'}}>
+            {messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
+              >
+                <div
+                  className={`max-w-xl px-5 py-3 rounded-2xl shadow-md ${
+                    msg.sender === 'user'
+                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                      : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-800 border border-gray-200'
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">{msg.text}</div>
+                </div>
+              </div>
+            ))}
+            
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-100 px-5 py-3 rounded-2xl border border-gray-200">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                    <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="border-t border-gray-200 p-6 bg-gradient-to-r from-gray-50 to-white">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={(e) => handleKeyPress(e, handleSendMessage)}
+                placeholder="Ask me to schedule something or check your calendar..."
+                className="flex-1 px-5 py-4 border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm"
+                disabled={loading}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={loading || !inputMessage.trim()}
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-2xl hover:from-indigo-700 hover:to-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              >
+                <Send className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="mt-3 flex gap-2 flex-wrap">
+              <button
+                onClick={() => setInputMessage("Schedule a meeting tomorrow at 3pm")}
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition"
+                disabled={loading}
+              >
+                Schedule meeting
+              </button>
+              <button
+                onClick={() => setInputMessage("What's on my calendar today?")}
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition"
+                disabled={loading}
+              >
+                Check today
+              </button>
+              <button
+                onClick={() => setInputMessage("Suggest when I have free time")}
+                className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 transition"
+                disabled={loading}
+              >
+                Get suggestions
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
