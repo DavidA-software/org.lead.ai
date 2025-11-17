@@ -6,15 +6,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 @Builder
-public class Response {
-    private String message;
-
-    private Long id;
+public class SimpleResetPasswordRequest {
     private String email;
-    private String firstName;
-    private String lastName;
-    private String token; // For password reset token
+    private String currentPassword;
+    private String newPassword;
 }
+
