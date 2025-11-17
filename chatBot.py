@@ -1,25 +1,58 @@
 import re
 from datetime import datetime, timedelta
 from typing import Optional, Dict
-
-from datetime import datetime, timedelta
-
+import random
 
 
 class SchedulingChatbot:
     """
-    An enhanced AI Chatbot with advanced NLP-driven scheduling capabilities.
+    An enhanced AI Chatbot with natural conversation and advanced scheduling.
     """
     
     def __init__(self):
         self.calendar = {}
         self.event_id_counter = 0
+        self.user_name = None
+        self.conversation_context = []
+        self.last_intent = None
+        self.pending_event = {}
+        
         print("🤖 Enhanced Scheduling Chatbot initialized and ready!")
-        print("💬 Try: 'Schedule team meeting tomorrow at 2pm'\n")
+        print("💬 I'm your personal scheduling assistant. What's your name?\n")
+
+    def set_context(self, intent: str, entities: Dict):
+        """Track conversation context for follow-ups."""
+        self.last_intent = intent
+        self.conversation_context.append({
+            'intent': intent,
+            'entities': entities,
+            'timestamp': datetime.now()
+        })
+        # Keep only last 5 interactions
+        if len(self.conversation_context) > 5:
+            self.conversation_context.pop(0)
 
     def extract_intent(self, text: str) -> str:
-        """Advanced intent classification."""
+        """Advanced intent classification with conversational context."""
         text_lower = text.lower()
+        
+        # Greetings
+        if any(kw in text_lower for kw in ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]):
+            return 'greeting'
+        
+        # Gratitude
+        if any(kw in text_lower for kw in ["thank", "thanks", "appreciate", "awesome", "perfect", "great"]):
+            return 'gratitude'
+        
+        # Confirmation (yes/no responses)
+        if text_lower.strip() in ["yes", "yeah", "yep", "sure", "ok", "okay", "yup", "correct", "right"]:
+            return 'confirm'
+        if text_lower.strip() in ["no", "nope", "nah", "not really", "cancel"]:
+            return 'deny'
+        
+        # Name introduction
+        if any(kw in text_lower for kw in ["my name is", "i'm", "i am", "call me"]):
+            return 'introduce_name'
         
         if any(kw in text_lower for kw in ["delete", "cancel", "remove", "clear"]):
             return 'delete_event'
@@ -43,6 +76,10 @@ class SchedulingChatbot:
         if any(kw in text_lower for kw in ["help", "what can you do", "how do i", "commands"]):
             return 'help'
         
+        # Small talk
+        if any(kw in text_lower for kw in ["how are you", "what's up", "wassup", "sup"]):
+            return 'smalltalk'
+        
         return 'unknown'
 
     def parse_date(self, text: str) -> Optional[str]:
@@ -56,6 +93,10 @@ class SchedulingChatbot:
             return (today + timedelta(days=1)).strftime('%Y-%m-%d')
         if 'yesterday' in text_lower:
             return (today - timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        # Next week
+        if 'next week' in text_lower:
+            return (today + timedelta(days=7)).strftime('%Y-%m-%d')
         
         weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
         for i, day in enumerate(weekdays):
@@ -132,7 +173,18 @@ class SchedulingChatbot:
 
     def extract_entities(self, text: str) -> Dict:
         """Enhanced entity extraction."""
-        entities = {'event': None, 'date': None, 'time': None, 'duration': None}
+        entities = {'event': None, 'date': None, 'time': None, 'duration': None, 'name': None}
+        
+        # Extract name
+        name_patterns = [
+            r"(?:my name is|i'm|i am|call me)\s+(\w+)",
+            r"^(\w+)$"  # Single word as name
+        ]
+        for pattern in name_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                entities['name'] = match.group(1).capitalize()
+                break
         
         entities['date'] = self.parse_date(text)
         entities['time'] = self.parse_time(text)
@@ -146,7 +198,7 @@ class SchedulingChatbot:
             else:
                 entities['duration'] = f"{value}m"
         
-        # Extract event name - simplified and robust
+        # Extract event name
         patterns = [
             r'(?:schedule|add|book|setup|create|plan)\s+(?:a\s+|an\s+)?(.+?)(?:\s+(?:on|at|tomorrow|today|yesterday|next|this|for|in)\s+|\s+\d)',
             r'(?:schedule|add|book|setup|create|plan)\s+(?:a\s+|an\s+)?(.+?)$',
@@ -166,7 +218,6 @@ class SchedulingChatbot:
         
         if not entities['event']:
             temp_text = text
-            
             for word in ['schedule', 'add', 'book', 'please', 'can you', 'could you', 'setup', 'create', 'plan']:
                 temp_text = re.sub(rf'\b{word}\b', '', temp_text, flags=re.IGNORECASE)
             
@@ -178,81 +229,13 @@ class SchedulingChatbot:
             if len(temp_text) > 2:
                 entities['event'] = temp_text
         
-
-
-    def extract_entities(self, text: str) -> dict:
-
-        """
-
-        Extracts key entities (date, time, event name) from the text.
-
-        (Simulated NLP Named Entity Recognition - NER)
-
-
-
-        Args:
-
-            text: The raw user input string.
-
-
-
-        Returns:
-
-            A dictionary of extracted entities.
-
-        """
-
-        entities = {'event': None, 'date': None, 'time': None}
-
-
-
-        # Simple date pattern simulation (e.g., "tomorrow", "Nov 15", "today")
-
-        date_match = re.search(r'on (.*?)(?: at |$)', text, re.IGNORECASE)
-
-        if date_match:
-
-            entities['date'] = date_match.group(1).strip()
-
-            # Simple simulation to convert common dates
-            if 'today' in entities['date'].lower():
-                entities['date'] = datetime.now().strftime('%Y-%m-%d')
-            elif 'tomorrow' in entities['date'].lower():
-                entities['date'] = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
-
-            # For demonstration, we assume a clean date format is provided or derived
-
-
-
-        # Simple time pattern simulation (e.g., "at 3pm", "14:00")
-
-        time_match = re.search(r'at (\d{1,2}(?::\d{2})?\s?(?:am|pm|o\'clock)?)', text, re.IGNORECASE)
-
-        if time_match:
-
-            entities['time'] = time_match.group(1).strip()
-
-
-
-        # Simple event extraction (the rest of the text, typically)
-
-        # This is very basic and would be handled better by a token-based model
-
-        event_match = re.search(r'to (.*?)(?: on |$)', text, re.IGNORECASE)
-
-        if event_match:
-
-            entities['event'] = event_match.group(1).strip()
-
-
-
         return entities
 
     def add_event(self, date: str, event_details: str, time: Optional[str] = None, 
                   duration: Optional[str] = None) -> str:
         """Add event with conflict detection."""
         if not date or not event_details:
-            return "❌ I need both a date and event description. Try: 'Schedule team meeting tomorrow at 2pm'"
+            return "🤔 I'd love to help! Could you tell me what you'd like to schedule and when?"
         
         if date not in self.calendar:
             self.calendar[date] = []
@@ -260,7 +243,7 @@ class SchedulingChatbot:
         if time:
             conflicts = [e for e in self.calendar[date] if time in e]
             if conflicts:
-                return f"⚠️ Warning: You already have an event at {time} on {date}:\n  • {conflicts[0]}\nScheduling anyway..."
+                return f"⚠️ Heads up! You already have something at {time} on that day:\n  • {conflicts[0]}\n\nShould I still add this event? (yes/no)"
         
         self.event_id_counter += 1
         event_str = f"[ID:{self.event_id_counter}] {event_details}"
@@ -274,7 +257,14 @@ class SchedulingChatbot:
         date_obj = datetime.strptime(date, '%Y-%m-%d')
         formatted_date = date_obj.strftime('%A, %B %d, %Y')
         
-        return f"✅ Event scheduled!\n📅 {formatted_date}\n⏰ {time or 'Time not specified'}\n📝 {event_details}"
+        responses = [
+            f"✅ Perfect! I've added '{event_details}' to your calendar.",
+            f"✅ All set! '{event_details}' is now scheduled.",
+            f"✅ Done! I've booked '{event_details}' for you.",
+        ]
+        
+        response = random.choice(responses)
+        return f"{response}\n📅 {formatted_date}\n⏰ {time or 'No specific time set'}"
 
     def get_schedule(self, date: Optional[str] = None, range_days: int = 1) -> str:
         """Get schedule with optional date range."""
@@ -293,13 +283,16 @@ class SchedulingChatbot:
                 events = '\n  • '.join(self.calendar[check_date])
                 results.append(f"📅 {formatted_date}:\n  • {events}")
             else:
-                results.append(f"📅 {formatted_date}: ✨ Free day!")
+                results.append(f"📅 {formatted_date}: ✨ Nothing scheduled - free day!")
         
         if results:
-            header = "🗓️  Your Schedule" if range_days == 1 else f"🗓️  Your {range_days}-Day Schedule"
+            if range_days == 1:
+                header = "🗓️  Here's what you have coming up:"
+            else:
+                header = f"🗓️  Your schedule for the next {range_days} days:"
             return f"{header}\n\n" + "\n\n".join(results)
         
-        return "✨ Your calendar is completely clear!"
+        return "✨ Your calendar is completely clear! Time to relax or plan something fun!"
 
     def delete_event(self, text: str) -> str:
         """Delete events by ID."""
@@ -310,15 +303,15 @@ class SchedulingChatbot:
                 for event in events:
                     if f"[ID:{event_id}]" in event:
                         self.calendar[date].remove(event)
-                        return f"✅ Deleted event: {event.split(']')[1].strip()}"
-            return f"❌ No event found with ID {event_id}"
+                        return f"✅ Got it! I've removed that event: {event.split(']')[1].strip()}"
+            return f"🤔 Hmm, I couldn't find an event with ID {event_id}. Try 'show my calendar' to see all events."
         
-        return "❌ Please specify an event ID. Use 'show calendar' to see IDs."
+        return "🤔 Could you tell me which event to delete? You can say 'delete event ID:5' for example."
 
     def make_suggestion(self) -> str:
         """Smart scheduling suggestions."""
         if not self.calendar:
-            return "💡 Your calendar is empty! Great time to:\n  • Block focus time for deep work\n  • Schedule regular breaks\n  • Plan your week ahead"
+            return "💡 Your calendar is completely open! Here are some ideas:\n  • Block time for focused work or creative projects\n  • Schedule regular breaks to recharge\n  • Plan out your week to stay organized"
         
         today = datetime.now()
         week_dates = [(today + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
@@ -327,72 +320,143 @@ class SchedulingChatbot:
         free_days = [date for date in week_dates if day_counts[date] == 0]
         busy_days = [date for date in week_dates if day_counts[date] >= 3]
         
-        suggestions = ["💡 Smart Scheduling Suggestions:\n"]
+        suggestions = ["💡 Here's what I'm thinking:\n"]
         
         if free_days:
             free_date = datetime.strptime(free_days[0], '%Y-%m-%d')
-            suggestions.append(f"  • {free_date.strftime('%A')} is completely free - perfect for focused work")
+            suggestions.append(f"  • {free_date.strftime('%A')} looks wide open - perfect for deep work or personal time!")
         
         if busy_days:
             busy_date = datetime.strptime(busy_days[0], '%Y-%m-%d')
-            suggestions.append(f"  • {busy_date.strftime('%A')} is packed - consider buffering breaks")
+            suggestions.append(f"  • {busy_date.strftime('%A')} is pretty packed - maybe add some buffer time?")
         
         lightest_day = min(day_counts, key=day_counts.get)
         lightest_date = datetime.strptime(lightest_day, '%Y-%m-%d')
-        suggestions.append(f"  • {lightest_date.strftime('%A')} has the most availability")
+        suggestions.append(f"  • {lightest_date.strftime('%A')} has the most availability if you need to schedule something")
         
         return "\n".join(suggestions)
 
     def show_help(self) -> str:
         """Display help message."""
-        return """
-🤖 **Scheduling Chatbot - Command Guide**
+        name_part = f" {self.user_name}" if self.user_name else ""
+        return f"""
+🤖 **Hey{name_part}! Here's what I can help you with:**
 
-📝 **Add Events:**
-  • "Schedule team meeting tomorrow at 2pm"
-  • "Add doctor appointment on Friday at 9:30am"
-  • "Book project review next Monday afternoon"
-
-📅 **Check Schedule:**
-  • "What's on my calendar today?"
-  • "Show me tomorrow's agenda"
-  • "What do I have this week?"
-
-🗑️ **Delete Events:**
+💬 **Just talk to me naturally! For example:**
+  • "Schedule a team meeting tomorrow at 2pm"
+  • "What do I have on Friday?"
+  • "Can you add lunch with Sarah next Monday at noon?"
+  • "Show me my week"
+  • "When am I free?"
   • "Delete event ID:5"
 
-💡 **Get Suggestions:**
-  • "When am I free this week?"
-  • "Suggest a good time to focus"
+🎯 **I understand casual language like:**
+  • "tomorrow afternoon" → I'll use 2pm
+  • "next Monday" → I'll find the right date
+  • "morning" → I'll set it for 9am
+
+💡 **Pro tip:** You can also ask me for scheduling suggestions or just chat!
 """
 
+    def handle_greeting(self) -> str:
+        """Handle greetings naturally."""
+        greetings = [
+            "Hey there! 👋 How can I help you today?",
+            "Hi! 😊 What can I do for you?",
+            "Hello! Ready to help with your schedule!",
+            "Hey! What's on your mind?"
+        ]
+        
+        if self.user_name:
+            greetings = [
+                f"Hey {self.user_name}! 👋 What can I help with?",
+                f"Hi {self.user_name}! 😊 How's it going?",
+                f"Hello {self.user_name}! Ready to help!",
+            ]
+        
+        return random.choice(greetings)
+
+    def handle_gratitude(self) -> str:
+        """Handle thank you messages."""
+        responses = [
+            "You're very welcome! 😊 Anything else I can help with?",
+            "Happy to help! Let me know if you need anything else!",
+            "My pleasure! 🎉 Feel free to ask if you need more help!",
+            "Glad I could assist! Is there anything else?",
+        ]
+        return random.choice(responses)
+
+    def handle_smalltalk(self) -> str:
+        """Handle small talk."""
+        responses = [
+            "I'm doing great, thanks for asking! 😊 How about you? Need help with anything?",
+            "All good here! Ready to help with your schedule. What's up?",
+            "I'm here and ready to help! What can I do for you today?",
+        ]
+        return random.choice(responses)
+
     def process_input(self, user_input: str) -> str:
-        """Main processing pipeline."""
+        """Main processing pipeline with natural conversation."""
         intent = self.extract_intent(user_input)
         entities = self.extract_entities(user_input)
         
-        print(f"\n[DEBUG] Input: '{user_input}'")
-        print(f"[DEBUG] Intent: {intent}")
-        print(f"[DEBUG] Entities: {entities}")
+        print(f"\n[DEBUG] Intent: {intent} | Entities: {entities}")
+        
+        # Handle name introduction
+        if intent == 'introduce_name' or (not self.user_name and entities.get('name')):
+            self.user_name = entities.get('name')
+            return f"Nice to meet you, {self.user_name}! 😊 I'm here to help manage your schedule. Try saying something like 'schedule a meeting tomorrow at 2pm'!"
+        
+        # Conversational intents
+        if intent == 'greeting':
+            return self.handle_greeting()
+        
+        if intent == 'gratitude':
+            return self.handle_gratitude()
+        
+        if intent == 'smalltalk':
+            return self.handle_smalltalk()
         
         if intent == 'help':
             return self.show_help()
         
-        elif intent == 'add_event':
+        # Handle confirmations for pending actions
+        if intent == 'confirm' and self.pending_event:
+            result = self.add_event(
+                self.pending_event.get('date'),
+                self.pending_event.get('event'),
+                self.pending_event.get('time'),
+                self.pending_event.get('duration')
+            )
+            self.pending_event = {}
+            return result
+        
+        if intent == 'deny' and self.pending_event:
+            self.pending_event = {}
+            return "No problem! The event wasn't added. What else can I help with?"
+        
+        # Main functionality
+        if intent == 'add_event':
             event = entities.get('event')
             date = entities.get('date')
             time = entities.get('time')
             duration = entities.get('duration')
             
             if not event:
-                return "🤔 What would you like to schedule? Try: 'Schedule team standup tomorrow at 10am'"
+                return "🤔 Sure! What would you like me to schedule?"
             if not date:
-                return "🤔 When should I schedule this? Try adding 'tomorrow' or a specific date."
+                return f"📅 Got it - '{event}'. When should I schedule this?"
             
-            return self.add_event(date, event, time, duration)
+            result = self.add_event(date, event, time, duration)
+            
+            # Check if there's a conflict and store pending event
+            if "⚠️" in result:
+                self.pending_event = {'date': date, 'event': event, 'time': time, 'duration': duration}
+            
+            return result
         
         elif intent == 'check_schedule':
-            if any(word in user_input.lower() for word in ['week', 'next 7', 'coming days']):
+            if any(word in user_input.lower() for word in ['week', 'next 7', 'coming days', 'next few']):
                 date = entities.get('date', datetime.now().strftime('%Y-%m-%d'))
                 return self.get_schedule(date, range_days=7)
             else:
@@ -406,23 +470,33 @@ class SchedulingChatbot:
             return self.make_suggestion()
         
         else:
-            return "🤔 I'm not sure what you'd like me to do. Type 'help' to see what I can do!"
+            helpful_suggestions = [
+                "🤔 I'm not quite sure what you mean. Try something like:\n  • 'Schedule a meeting tomorrow at 3pm'\n  • 'What's on my calendar?'\n  • 'Show me this week'",
+                "🤔 Hmm, I didn't catch that. You can say things like:\n  • 'Add lunch with Alex on Friday'\n  • 'When am I free?'\n  • Type 'help' to see more!",
+            ]
+            return random.choice(helpful_suggestions)
+
+        self.set_context(intent, entities)
 
 
 if __name__ == '__main__':
     bot = SchedulingChatbot()
     
     print("\n" + "=" * 80)
-    print("🎬 LIVE DEMO")
+    print("🎬 CONVERSATIONAL DEMO")
     print("=" * 80)
     
     demo_commands = [
+        "Hi there!",
+        "My name is Alex",
         "Schedule team meeting tomorrow at 3pm",
-        "Add doctor appointment on Friday at 9:30am",
+        "Can you add doctor appointment on Friday at 9:30am?",
         "Book lunch next Monday at noon",
         "What's on my calendar tomorrow?",
         "Show me this week",
         "When am I free this week?",
+        "Thanks!",
+        "What can you do?"
     ]
     
     for cmd in demo_commands:
